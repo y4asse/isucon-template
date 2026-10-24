@@ -64,33 +64,58 @@ Host s3
 
 ### 2. 全サーバーにリポジトリを展開（手元のリポジトリで）
 
-1 行ずつ実行し、エラーが出たらその行だけやり直す。
+1 つずつ実行し、エラーが出たらそれだけやり直す。
 
-```sh
-# Deploy key を送る
-for h in s1 s2 s3; do scp ~/.ssh/isucon_deploy_key $h:.ssh/id_ed25519 && ssh $h chmod 600 .ssh/id_ed25519; done
+1. リポジトリの URL を設定（SSH 形式。以降のコマンドで使う）
 
-# リポジトリを展開（既存ファイルはそのまま、履歴だけ取り込む）
-for h in s1 s2 s3; do ssh $h 'ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null && git init -q -b main && git remote add origin git@github.com:<owner>/<repo>.git && git fetch -q origin main && git reset -q origin/main && git checkout -- . && git log --oneline -1'; done
+   ```sh
+   REPO=git@github.com:<owner>/<repo>.git
+   ```
 
-# サーバー ID を設定（Host 名をそのまま使う）
-for h in s1 s2 s3; do ssh $h make set-id ID=$h; done
+2. Deploy key を送る
 
-# ツール導入と git 設定（全サーバー並列）
-make all-setup
+   ```sh
+   for h in s1 s2 s3; do scp ~/.ssh/isucon_deploy_key $h:.ssh/id_ed25519 && ssh $h chmod 600 .ssh/id_ed25519; done
+   ```
 
-# .env を送る
-for h in s1 s2 s3; do scp .env $h:.env; done
-```
+3. リポジトリを展開（既存ファイルはそのまま、履歴だけ取り込む）。3 台とも最新コミットが表示されれば成功
 
-`make all-setup` の最後に表示される `SERVICE` と `BIN` が空なら `config.mk` で設定する。
+   ```sh
+   for h in s1 s2 s3; do ssh $h "ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null && git init -q -b main && git remote add origin $REPO && git fetch -q origin main && git reset -q origin/main && git checkout -- . && git log --oneline -1"; done
+   ```
+
+   失敗して空の `.git` が残ったら、消してからやり直す
+
+   ```sh
+   for h in s1 s2 s3; do ssh $h 'test -z "$(git -C ~ rev-parse -q --verify HEAD)" && rm -rf ~/.git'; done
+   ```
+
+4. サーバー ID を設定（Host 名をそのまま使う）
+
+   ```sh
+   for h in s1 s2 s3; do ssh $h make set-id ID=$h; done
+   ```
+
+5. ツール導入と git 設定（全サーバー並列）。最後に表示される `SERVICE` と `BIN` が空なら `config.mk` で設定する
+
+   ```sh
+   make all-setup
+   ```
+
+6. `.env` を送る
+
+   ```sh
+   for h in s1 s2 s3; do scp .env $h:.env; done
+   ```
 
 ### 3. 初期状態をコミット（s1 だけ）
 
+初期状態の記録、`/etc` の設定と `env.sh` の取り込み、使わない言語の実装などの gitignore をしてからコミットする。
+
 ```sh
 make snapshot
-make pull-conf            # /etc の設定と env.sh を取り込む
-make ignore-langs         # 使わない言語の実装などを gitignore
+make pull-conf
+make ignore-langs
 git add -A && git commit -m "初期状態" && git push origin main
 ```
 
@@ -111,12 +136,24 @@ go func() { log.Println(http.ListenAndServe("localhost:6060", nil)) }()
 
 ### 5. 初回ベンチ
 
-```sh
-make all-bench-prep       # 手元から（全サーバーでログ退避・slow log ON）
-# ポータルからベンチ実行。別ペインで make log
-make score S=<スコア> M="初期状態"   # s1 で
-make all-analyze
-```
+1. 手元から全サーバーでログ退避・slow log ON
+
+   ```sh
+   make all-bench-prep
+   ```
+
+2. ポータルからベンチ実行。別ペインで `make log`
+3. s1 でスコアを記録（`12345` をスコアに置き換える）
+
+   ```sh
+   make score S=12345 M="初期状態"
+   ```
+
+4. 手元から全サーバーで解析
+
+   ```sh
+   make all-analyze
+   ```
 
 ## 改善サイクル
 
