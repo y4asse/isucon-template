@@ -9,6 +9,8 @@ SERVICE ?= $(shell systemctl list-unit-files --type=service --no-legend 2>/dev/n
 BIN ?= $(shell systemctl show -p ExecStart --value $(SERVICE) 2>/dev/null | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -1)
 BUILD_CMD ?= cd $(dir $(BIN)) && go build -o $(BIN) .
 SHA = $(shell git rev-parse --short HEAD)
+# 動いているコードの SHA（make deploy で記録。score のコミットで HEAD が進んでも変わらない）
+DEPLOYED_SHA = $(shell cat .deployed_sha 2>/dev/null || git rev-parse --short HEAD)
 TS = $(shell date +%m%d-%H%M%S)
 
 .DEFAULT_GOAL := help
@@ -22,6 +24,9 @@ setup: ## ツール導入と git 設定（各サーバーで 1 回）
 	ARCH=$$(dpkg --print-architecture); \
 	curl -sSL -o /tmp/alp.tar.gz https://github.com/tkuchiki/alp/releases/download/v1.0.22/alp_linux_$${ARCH}.tar.gz && \
 	tar -xzf /tmp/alp.tar.gz -C /tmp alp && sudo install /tmp/alp /usr/local/bin/alp && rm -f /tmp/alp /tmp/alp.tar.gz
+	sudo timedatectl set-timezone Asia/Tokyo
+	@# 動いているプロセスは起動時のタイムゾーンのままなので、ログの時刻を揃えるため再起動
+	@for s in nginx $(DB_SERVICE); do if systemctl is-active --quiet $$s; then sudo systemctl restart $$s && echo "restart: $$s"; fi; done
 	git config --global user.name "isucon-$(SERVER_ID)"
 	git config --global user.email "isucon@example.com"
 	git config --global pull.ff only
@@ -72,6 +77,7 @@ deploy: check-server-id ## pull → ビルド → 設定反映 → 再起動 →
 
 .PHONY: deploy-after-pull
 deploy-after-pull: build deploy-conf restart
+	@echo $(SHA) > .deployed_sha
 	@tools/notify.sh "deploy: $(BRANCH)@$(SHA)"
 
 .PHONY: deploy-all
@@ -109,7 +115,7 @@ bench-prep: check-server-id ## ログ退避・SQL 統計リセット・スロー
 	@if systemctl is-active --quiet $(DB_SERVICE); then \
 	  echo "SET GLOBAL slow_query_log_file='$(SLOW_LOG)'; SET GLOBAL long_query_time=0; SET GLOBAL slow_query_log=ON; TRUNCATE performance_schema.events_statements_summary_by_digest;" | sudo mysql && echo "slow log: ON"; \
 	fi
-	@tools/notify.sh "bench-prep: $(BRANCH)@$(SHA)"
+	@tools/notify.sh "bench-prep: $(BRANCH)@$(DEPLOYED_SHA)"
 
 .PHONY: log
 log: ## アプリのログを tail（ベンチ中に別ペインで）
@@ -119,7 +125,7 @@ log: ## アプリのログを tail（ベンチ中に別ペインで）
 
 .PHONY: analyze
 analyze: check-server-id ## alp / pt-query-digest / SQL digest を analysis/ に保存して Discord へ
-	$(eval OUT := $(HOME)/analysis/$(TS)-$(SHA)-$(SERVER_ID))
+	$(eval OUT := $(HOME)/analysis/$(TS)-$(DEPLOYED_SHA)-$(SERVER_ID))
 	mkdir -p $(OUT)
 	@if sudo test -s $(NGINX_LOG); then sudo alp ltsv --config tools/alp.yml --file $(NGINX_LOG) > $(OUT)/alp.txt; fi
 	@if sudo test -s $(SLOW_LOG); then sudo pt-query-digest $(SLOW_LOG) > $(OUT)/slow.txt 2>/dev/null; fi
@@ -127,12 +133,12 @@ analyze: check-server-id ## alp / pt-query-digest / SQL digest を analysis/ に
 	@ls $(OUT)/* >/dev/null 2>&1 || (echo "解析対象のログがありません"; exit 0)
 	@test ! -f $(OUT)/alp.txt || head -n 25 $(OUT)/alp.txt
 	@echo "保存先: $(OUT)"
-	@tools/notify.sh "analyze: $(BRANCH)@$(SHA)" $(OUT)/*.txt
+	@tools/notify.sh "analyze: $(BRANCH)@$(DEPLOYED_SHA)" $(OUT)/*.txt
 
 .PHONY: score
 score: ## スコアを記録（make score S=12345 M="メモ"）
 	@test -n "$(S)" || (echo 'make score S=12345 M="メモ"'; exit 1)
-	$(eval DEPLOYED := $(SHA))
+	$(eval DEPLOYED := $(DEPLOYED_SHA))
 	git pull --rebase --autostash origin $(BRANCH)
 	printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$$(date '+%F %T')" "$(SERVER_ID)" "$(BRANCH)" "$(DEPLOYED)" "$(S)" "$(M)" >> scores.tsv
 	git add scores.tsv && git commit -q -m "score: $(S) $(M)" && (git push -q origin HEAD:$(BRANCH) || echo "push に失敗しました。あとで git push してください")
@@ -141,8 +147,8 @@ score: ## スコアを記録（make score S=12345 M="メモ"）
 .PHONY: pprof
 pprof: ## pprof を 60 秒取得して ~/pprof/ に保存
 	mkdir -p ~/pprof
-	go tool pprof -proto -seconds 60 http://localhost:$(PPROF_PORT)/debug/pprof/profile > ~/pprof/$(TS)-$(SHA).pb.gz
-	@echo "保存先: ~/pprof/$(TS)-$(SHA).pb.gz（make pprof-web で表示）"
+	go tool pprof -proto -seconds 60 http://localhost:$(PPROF_PORT)/debug/pprof/profile > ~/pprof/$(TS)-$(DEPLOYED_SHA).pb.gz
+	@echo "保存先: ~/pprof/$(TS)-$(DEPLOYED_SHA).pb.gz（make pprof-web で表示）"
 
 .PHONY: pprof-web
 pprof-web: ## 最新の pprof を :8090 で表示（手元で ssh -L 8090:localhost:8090）
@@ -171,7 +177,7 @@ mysql: ## MySQL に接続
 
 .PHONY: info
 info: ## 検出・設定値を表示
-	@echo "SERVER_ID=$(SERVER_ID)"; echo "SERVICE=$(SERVICE)"; echo "BIN=$(BIN)"; echo "BUILD_CMD=$(BUILD_CMD)"; echo "BRANCH=$(BRANCH) SHA=$(SHA)"
+	@echo "SERVER_ID=$(SERVER_ID)"; echo "SERVICE=$(SERVICE)"; echo "BIN=$(BIN)"; echo "BUILD_CMD=$(BUILD_CMD)"; echo "BRANCH=$(BRANCH) SHA=$(SHA) DEPLOYED_SHA=$(DEPLOYED_SHA)"
 
 .PHONY: check-server-id
 check-server-id:

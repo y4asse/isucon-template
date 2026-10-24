@@ -44,6 +44,7 @@ ISUCON 用のテンプレートリポジトリ。お題に依存しない仕組�
 
 # Git 管理外
 ~/.server_id                   # make set-id で作成
+~/.deployed_sha                # make deploy で記録。score / analyze / pprof はこの SHA を使う
 ~/analysis/<時刻>-<SHA>-sN/    # make analyze の結果
 ~/logs/<時刻>/                 # make bench-prep で退避したログ
 ```
@@ -74,7 +75,7 @@ etc/common/etc/
 | タイミング | コマンド | 内容 |
 |---|---|---|
 | 開始直後 | `make set-id ID=s1` | サーバー ID を設定 |
-| | `make setup` | alp / pt-query-digest などのツール導入、git 設定 |
+| | `make setup` | alp / pt-query-digest などのツール導入、タイムゾーンを JST に、git 設定 |
 | | `make snapshot` | 初期状態を `snapshots/sN/` に記録 |
 | | `make pull-conf` | `/etc` の設定と `env.sh` を取り込み（s1 で） |
 | | `make ignore-langs` | 使わない言語・ビルド成果物・10MB 超のファイルを gitignore |
