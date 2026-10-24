@@ -1,0 +1,18 @@
+# ISUCON 用の追加設定（mysqld.cnf より後に読まれて上書きする）
+# スロークエリログの ON/OFF は make bench-prep / make finalize で動的に切り替える
+[mysqld]
+slow_query_log_file = /var/log/mysql/mysql-slow.log
+
+# バイナリログを無効化（レプリケーションしないので不要）
+disable-log-bin
+
+# コミットごとのディスク同期をやめる（再起動テストは正常終了なのでデータは残る）
+innodb_flush_log_at_trx_commit = 2
+
+# ---- 状況に応じて有効化 ----
+# innodb_buffer_pool_size = 1G     # DB 専用サーバーなら物理メモリの 6〜8 割
+# innodb_flush_method = O_DIRECT
+# max_connections = 1024
+# DB を別サーバーに分けるとき
+# bind-address = 0.0.0.0
+# mysqlx-bind-address = 0.0.0.0

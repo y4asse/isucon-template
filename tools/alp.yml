@@ -1,0 +1,12 @@
+sort: sum
+reverse: true
+query_string: true
+query_string_ignore_values: true
+output: count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg,p99
+percentiles: [50, 90, 99]
+# ID などで URL が分かれるものを 1 行にまとめる（当日お題に合わせて書き換える）
+matching_groups:
+  # - '^/api/chair/rides/[0-9A-Z]+/status$'
+  # - '^/api/users/[^/]+$'
+  - '^/assets/'
+  - '^/images/'

@@ -1,0 +1,20 @@
+# git root が /home/isucon なので、許可したものだけを管理する（.ssh などの誤コミット防止）
+/*
+!/.gitignore
+!/.env.example
+!/README.md
+!/Makefile
+!/config.mk
+!/scores.tsv
+!/docs/
+!/env/
+!/etc/
+!/snapshots/
+!/tools/
+!/webapp/
+
+# webapp 内の不要物（使わない言語の実装やビルド成果物は make ignore-langs で下に追記される）
+node_modules/
+*.log
+
+# ---- 以下 make ignore-langs が自動追記 ----
