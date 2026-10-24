@@ -1,4 +1,25 @@
-# 当日の手順書
+# 手順書
+
+前日の準備から当日のセットアップ・改善サイクルまで、上から順に進める。
+
+## 前日まで
+
+1. GitHub で **Use this template** → **private** リポジトリを作成し、メンバーをコラボレーターに招待
+2. Deploy key 用の鍵を作り、リポジトリの Settings > Deploy keys に登録（Allow write access にチェック）
+
+   ```sh
+   ssh-keygen -t ed25519 -f ~/.ssh/isucon_deploy_key -N ""
+   ```
+
+3. Discord 通知を使うなら、手元のリポジトリで `.env` を作り `DISCORD_WEBHOOK_URL` を書く（Git 管理外なのでコミットされない）
+
+   ```sh
+   cp .env.example .env
+   ```
+
+   Webhook URL は Discord のチャンネル設定 → 連携サービス → ウェブフック → 新しいウェブフック → URL をコピー
+4. 各メンバーの SSH 公開鍵が GitHub に登録されていることを確認（本番はその鍵で `isucon` ユーザーに入る）
+5. 下の役割分担を決める
 
 ## 役割分担（3 人の例）
 
@@ -41,12 +62,10 @@ Host s3
   User isucon
 ```
 
-Deploy key と `.env`（前日に作ったもの）を各サーバーに送る。`.env` はリポジトリ展開後（手順 2 の後）に送る。
+前日に作った Deploy key を各サーバーに送る（手元で）。
 
 ```sh
 for h in s1 s2 s3; do scp ~/.ssh/isucon_deploy_key $h:~/.ssh/id_ed25519 && ssh $h chmod 600 .ssh/id_ed25519; done
-# 手順 2 の後
-for h in s1 s2 s3; do scp .env $h:~/.env; done
 ```
 
 ### 2. 各サーバーでリポジトリを展開（s1 → s2 → s3 の順）
@@ -63,6 +82,12 @@ make setup
 ```
 
 `make setup` の最後に表示される `SERVICE` と `BIN` が空なら `config.mk` で設定する。
+
+3 台とも終わったら、前日に作った `.env` を送る（手元で）。
+
+```sh
+for h in s1 s2 s3; do scp .env $h:~/.env; done
+```
 
 ### 3. 初期状態をコミット（s1 だけ）
 

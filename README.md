@@ -40,7 +40,7 @@ ISUCON 用のテンプレートリポジトリ。お題に依存しない仕組�
 ├── snapshots/sN/              # 初期状態（サービス一覧・ポート・パッケージなど）
 ├── webapp/                    # 使わない言語の実装は make ignore-langs で gitignore
 ├── scores.tsv                 # 時刻・サーバー・ブランチ・SHA・スコア・メモ
-└── docs/runbook.md            # 当日の手順書（役割分担・時間配分・トラブル対応）
+└── docs/runbook.md            # 手順書（前日の準備・役割分担・時間配分・セットアップ・トラブル対応）
 
 # Git 管理外
 ~/.server_id                   # make set-id で作成
@@ -70,19 +70,10 @@ ISUCON 用のテンプレートリポジトリ。お題に依存しない仕組�
 
 ## 新しい大会・練習を始めるとき
 
-### 前日まで
-
-1. GitHub で **Use this template** → **private** リポジトリを作成
-2. Deploy key 用の鍵を作り（`ssh-keygen -t ed25519 -f ~/.ssh/isucon_deploy_key -N ""`）、リポジトリの Settings > Deploy keys に登録（Allow write access にチェック）
-3. `.env.example` をコピーして `.env` を作り、`DISCORD_WEBHOOK_URL` を設定してコミットせずに保管
-4. [docs/runbook.md](docs/runbook.md) を読んで役割分担を決める
-
-### 当日
-
-[docs/runbook.md](docs/runbook.md) の手順に沿って進める。
+前日の準備から当日の流れまで、すべて [docs/runbook.md](docs/runbook.md) に沿って進める。
 
 ```
-セットアップ（30 分）→ 初回ベンチ → 改善サイクル → 17:00 finalize → 再起動テスト → 最終ベンチ
+前日の準備 → セットアップ（30 分）→ 初回ベンチ → 改善サイクル → 17:00 finalize → 再起動テスト → 最終ベンチ
 ```
 
 ## 参考にしたもの
