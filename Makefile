@@ -2,6 +2,8 @@ include config.mk
 
 SHELL := /bin/bash
 export PATH := $(HOME)/local/golang/bin:$(HOME)/go/bin:/usr/local/go/bin:$(PATH)
+# scores.tsv やログ・解析フォルダ名の時刻を JST にする（サーバーのタイムゾーンはアプリや DB に影響するので変えない）
+export TZ := Asia/Tokyo
 
 # ----- 自動検出（config.mk で設定されていればそちらを優先） -----
 SERVER_ID = $(shell cat .server_id 2>/dev/null)
@@ -11,7 +13,7 @@ BUILD_CMD ?= cd $(dir $(BIN)) && go build -o $(BIN) .
 SHA = $(shell git rev-parse --short HEAD)
 # 動いているコードの SHA（make deploy で記録。score のコミットで HEAD が進んでも変わらない）
 DEPLOYED_SHA = $(shell cat .deployed_sha 2>/dev/null || git rev-parse --short HEAD)
-TS = $(shell date +%m%d-%H%M%S)
+TS = $(shell TZ=$(TZ) date +%m%d-%H%M%S)
 
 .DEFAULT_GOAL := help
 
@@ -24,9 +26,6 @@ setup: ## ツール導入と git 設定（各サーバーで 1 回）
 	ARCH=$$(dpkg --print-architecture); \
 	curl -sSL -o /tmp/alp.tar.gz https://github.com/tkuchiki/alp/releases/download/v1.0.22/alp_linux_$${ARCH}.tar.gz && \
 	tar -xzf /tmp/alp.tar.gz -C /tmp alp && sudo install /tmp/alp /usr/local/bin/alp && rm -f /tmp/alp /tmp/alp.tar.gz
-	sudo timedatectl set-timezone Asia/Tokyo
-	@# 動いているプロセスは起動時のタイムゾーンのままなので、ログの時刻を揃えるため再起動
-	@for s in nginx $(DB_SERVICE); do if systemctl is-active --quiet $$s; then sudo systemctl restart $$s && echo "restart: $$s"; fi; done
 	git config --global user.name "isucon-$(SERVER_ID)"
 	git config --global user.email "isucon@example.com"
 	git config --global pull.ff only
