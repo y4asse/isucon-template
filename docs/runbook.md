@@ -152,16 +152,46 @@ Host s3
 
 ### 4. 計測の準備
 
-1. `etc/common/etc/nginx/nginx.conf` の `access_log` を `access_log /var/log/nginx/access.log ltsv;` に変更
-2. Go なら pprof を仕込む（下記）
-3. コミットして `make deploy`
+すべて手元のリポジトリで作業する。
 
-```go
-import _ "net/http/pprof"
+1. `etc/common/etc/nginx/nginx.conf` の `access_log /var/log/nginx/access.log;` の行を消す。LTSV 形式の `access_log` は `etc/common/etc/nginx/conf.d/00-isucon-log.conf` に書いてある
+2. 有効な `access_log` が `00-isucon-log.conf` の 1 行だけになったことを確認（sites-available 側にもあれば消す）
 
-// main() の最初の方に追加
-go func() { log.Println(http.ListenAndServe("localhost:6060", nil)) }()
-```
+   ```sh
+   grep -rnE '^\s*access_log' etc/common/etc/nginx/
+   ```
+
+3. Go なら `webapp/go/main.go` に pprof を仕込む。`import (` の中に 1 行、`func main() {` の直後に 1 行足す
+
+   ```go
+   	_ "net/http/pprof"
+   ```
+
+   ```go
+   	go func() { _ = http.ListenAndServe("localhost:6060", nil) }()
+   ```
+
+4. コミットして push し、全サーバーにデプロイ。各サーバーで `reload: nginx` と `restart: isuride-go.service` が出れば OK（nginx の設定エラーなら `nginx -t` の出力が出て止まる）
+
+   ```sh
+   git add -A && git commit -m "計測の準備" && git push origin main
+   ```
+
+   ```sh
+   make deploy-all
+   ```
+
+5. LTSV でログが出ていることを確認。`time:` で始まる行が出れば OK
+
+   ```sh
+   ssh s1 'curl -sk -o /dev/null https://localhost/ && sudo tail -n 1 /var/log/nginx/access.log'
+   ```
+
+6. pprof が動いていることを確認。`200` が出れば OK
+
+   ```sh
+   ssh s1 'curl -s -o /dev/null -w "%{http_code}\n" localhost:6060/debug/pprof/'
+   ```
 
 ### 5. 初回ベンチ
 

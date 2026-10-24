@@ -154,7 +154,7 @@ pprof-web: ## 最新の pprof を :8090 で表示（手元で ssh -L 8090:localh
 .PHONY: finalize
 finalize: ## スロークエリログ OFF と、提出前チェック
 	@if systemctl is-active --quiet $(DB_SERVICE); then echo "SET GLOBAL slow_query_log=OFF;" | sudo mysql && echo "✓ slow log: OFF"; fi
-	@if grep -rqsE '^\s*access_log\s+[^o;][^;]*;' /etc/nginx/; then echo "✗ nginx の access_log が有効です（access_log off; にして deploy）"; grep -rnsE '^\s*access_log\s' /etc/nginx/; else echo "✓ nginx access_log: off"; fi
+	@if grep -rqsE '^\s*access_log\s+[^o;][^;]*;' /etc/nginx/; then echo "✗ nginx の access_log が有効です（etc/common/etc/nginx/conf.d/00-isucon-log.conf の access_log を off; にして deploy）"; grep -rnsE '^\s*access_log\s' /etc/nginx/; else echo "✓ nginx access_log: off"; fi
 	@if grep -rqsE 'net/http/pprof|fgprof' webapp/ 2>/dev/null; then echo "✗ pprof のコードが残っています"; grep -rlsE 'net/http/pprof|fgprof' webapp/; else echo "✓ pprof: なし"; fi
 	@for s in $(SERVICE) nginx $(DB_SERVICE) $(EXTRA_SERVICES); do printf '  %-28s active=%-9s enabled=%s\n' $$s "$$(systemctl is-active $$s)" "$$(systemctl is-enabled $$s 2>/dev/null)"; done
 	@echo

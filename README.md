@@ -25,7 +25,7 @@ ISUCON 用のテンプレートリポジトリ。お題に依存しない仕組�
 ├── config.mk                  # ★当日編集：サーバー一覧・DB・ログのパスなど
 ├── .env.example               # DISCORD_WEBHOOK_URL（コピーして .env を作る。.env は Git 管理外）
 ├── etc/
-│   ├── common/etc/...         # 全台共通（nginx の LTSV ログ形式、MySQL・sysctl の追加設定）
+│   ├── common/etc/...         # 全台共通（nginx の LTSV ログ、MySQL・sysctl の追加設定）
 │   └── s1/ s2/ s3/etc/...     # サーバー別（同じパスなら common より優先）
 ├── env/
 │   ├── env.common.sh          # アプリの環境変数（make pull-conf で ~/env.sh から取り込み）
