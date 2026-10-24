@@ -62,32 +62,28 @@ Host s3
   User isucon
 ```
 
-前日に作った Deploy key を各サーバーに送る（手元で）。
+### 2. 全サーバーにリポジトリを展開（手元のリポジトリで）
+
+1 行ずつ実行し、エラーが出たらその行だけやり直す。
 
 ```sh
-for h in s1 s2 s3; do scp ~/.ssh/isucon_deploy_key $h:~/.ssh/id_ed25519 && ssh $h chmod 600 .ssh/id_ed25519; done
+# Deploy key を送る
+for h in s1 s2 s3; do scp ~/.ssh/isucon_deploy_key $h:.ssh/id_ed25519 && ssh $h chmod 600 .ssh/id_ed25519; done
+
+# リポジトリを展開（既存ファイルはそのまま、履歴だけ取り込む）
+for h in s1 s2 s3; do ssh $h 'ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null && git init -q -b main && git remote add origin git@github.com:<owner>/<repo>.git && git fetch -q origin main && git reset -q origin/main && git checkout -- . && git log --oneline -1'; done
+
+# サーバー ID を設定（Host 名をそのまま使う）
+for h in s1 s2 s3; do ssh $h make set-id ID=$h; done
+
+# ツール導入と git 設定（全サーバー並列）
+make all-setup
+
+# .env を送る
+for h in s1 s2 s3; do scp .env $h:.env; done
 ```
 
-### 2. 各サーバーでリポジトリを展開（s1 → s2 → s3 の順）
-
-```sh
-cd ~
-git init -b main
-git remote add origin git@github.com:<owner>/<repo>.git
-git fetch origin main
-git reset origin/main     # 既存ファイルはそのまま、履歴だけ取り込む
-git checkout -- .         # Makefile などを展開
-make set-id ID=s1         # s2 / s3 ではそれぞれの ID
-make setup
-```
-
-`make setup` の最後に表示される `SERVICE` と `BIN` が空なら `config.mk` で設定する。
-
-3 台とも終わったら、前日に作った `.env` を送る（手元で）。
-
-```sh
-for h in s1 s2 s3; do scp .env $h:~/.env; done
-```
+`make all-setup` の最後に表示される `SERVICE` と `BIN` が空なら `config.mk` で設定する。
 
 ### 3. 初期状態をコミット（s1 だけ）
 
