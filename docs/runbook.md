@@ -195,37 +195,102 @@ Host s3
 
 ### 5. 初回ベンチ
 
-1. 手元から全サーバーでログ退避・slow log ON
+すべて手元のリポジトリで実行する。
+
+1. 全サーバーでログ退避・slow log ON
 
    ```sh
    make all-bench-prep
    ```
 
-2. ポータルからベンチ実行。別ペインで `make log`
-3. s1 でスコアを記録（`12345` をスコアに置き換える）
+2. ポータルからベンチ実行。ベンチ中は別ペインで s1 のアプリのログを見る（Ctrl+C で抜ける）
 
    ```sh
-   make score S=12345 M="初期状態"
+   ssh -t s1 make log
    ```
 
-4. 手元から全サーバーで解析
+3. s1 でスコアを記録して push（`12345` をスコアに置き換える）
+
+   ```sh
+   ssh s1 'make score S=12345 M="初期状態"'
+   ```
+
+4. 全サーバーで解析。結果は Discord に投稿され、各サーバーの `~/analysis/` にも保存される
 
    ```sh
    make all-analyze
    ```
 
+5. s1 が push したスコアを手元に取り込む
+
+   ```sh
+   git pull
+   ```
+
 ## 改善サイクル
 
-```
-手元で改善してコミット・push
-  → make deploy-all（または各サーバーで make deploy）
-  → make all-bench-prep
-  → ポータルでベンチ
-  → make score S=... M="..."（どれか 1 台で）
-  → make all-analyze
+すべて手元のリポジトリで実行する。
+
+1. 最新を取り込む（スコアの記録で s1 が push しているため）
+
+   ```sh
+   git pull
+   ```
+
+2. 改善してコミット・push（1 コミット 1 目的）
+
+   ```sh
+   git add -A && git commit -m "変更内容" && git push origin main
+   ```
+
+3. 全サーバーにデプロイ
+
+   ```sh
+   make deploy-all
+   ```
+
+4. ベンチの準備
+
+   ```sh
+   make all-bench-prep
+   ```
+
+5. ポータルからベンチ実行。別ペインで s1 のアプリのログを見る
+
+   ```sh
+   ssh -t s1 make log
+   ```
+
+   pprof を取るなら、ベンチ開始直後にさらに別ペインで（60 秒取得して s1 の `~/pprof/` に保存）
+
+   ```sh
+   ssh s1 make pprof
+   ```
+
+6. スコアを記録（`12345` と `変更内容` を置き換える）
+
+   ```sh
+   ssh s1 'make score S=12345 M="変更内容"'
+   ```
+
+7. 解析
+
+   ```sh
+   make all-analyze
+   ```
+
+8. pprof を見るなら、s1 で表示サーバーを立ててブラウザで <http://localhost:8090> を開く（Ctrl+C で終了）
+
+   ```sh
+   ssh -L 8090:localhost:8090 s1 make pprof-web
+   ```
+
+スコアが下がったら直前のコミットを打ち消してデプロイし直す。
+
+```sh
+git revert --no-edit HEAD && git push origin main && make deploy-all
 ```
 
-- 1 コミット 1 目的。スコアが下がったら `git revert`
 - DB のスキーマ・インデックスを変えるときはチームに一声かける
 - 30 分詰まったら別の改善へ
 - 計測結果（`~/analysis/`）は Git には入れない。Discord に投稿されたものをチームで見る
@@ -234,14 +299,18 @@ Host s3
 
 - サーバー別の設定は `etc/sN/etc/...` に置く（同じパスのファイルは common より優先）
 - サーバー別の環境変数は `env/env.sN.sh`
-- 使わないサービスは止めて自動起動も切る：`sudo systemctl disable --now <サービス>`
 - DB を分けたら `99-isucon.cnf` の `bind-address` を有効化し、アプリ側の DB ホストを変更
+- 使わないサービスは止めて自動起動も切る（手元で。`s2` と `<サービス>` を置き換える）
+
+  ```sh
+  ssh s2 sudo systemctl disable --now <サービス>
+  ```
 
 ## トラブル時
 
-| 症状 | 確認すること |
+| 症状 | 確認すること（手元で。`s1` は該当サーバーに置き換える） |
 |---|---|
-| ベンチが失敗する | `make log` でアプリのエラー、`sudo tail /var/log/nginx/error.log` |
-| deploy で nginx がエラー | `sudo nginx -t` の出力を見る（反映前に止まるので nginx は動いたまま） |
-| 変更が反映されない | `make info` で SERVICE / BIN を確認、`git log -1` で最新か確認 |
-| 壊れた | `git revert` → `make deploy`。設定ファイルは `etc/common/` が元の状態 |
+| ベンチが失敗する | アプリのエラー：`ssh -t s1 make log`<br>nginx のエラー：`ssh s1 sudo tail -n 50 /var/log/nginx/error.log` |
+| deploy で nginx がエラー | `ssh s1 sudo nginx -t` の出力を見る（反映前に止まるので nginx は古い設定のまま動いている） |
+| 変更が反映されない | `ssh s1 make info` で SERVICE / BIN を確認、`ssh s1 git log --oneline -1` で最新か確認 |
+| 壊れた | `git revert --no-edit HEAD && git push origin main && make deploy-all`。設定ファイルは `etc/common/` の最初のコミットが元の状態 |
