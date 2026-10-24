@@ -109,18 +109,46 @@ Host s3
    for h in "${SERVERS[@]}"; do scp .env $h:.env; done
    ```
 
-### 3. 初期状態をコミット（s1 だけ）
+### 3. 初期状態をコミット
 
-初期状態の記録、`/etc` の設定と `env.sh` の取り込み、使わない言語の実装などの gitignore をしてからコミットする。
+1. s1 に入る（手元で）
 
-```sh
-make snapshot
-make pull-conf
-make ignore-langs
-git add -A && git commit -m "初期状態" && git push origin main
-```
+   ```sh
+   ssh s1
+   ```
 
-s2・s3 では `git pull` してから `make snapshot` → コミット。
+2. 初期状態の記録、`/etc` の設定と `env.sh` の取り込み、使わない言語の実装などの gitignore（s1 で）
+
+   ```sh
+   make snapshot
+   make pull-conf
+   make ignore-langs
+   ```
+
+3. コミットされるものを確認（s1 で）。`webapp/` の他言語の実装や巨大なファイルが入っていなければ OK
+
+   ```sh
+   git add -A && git status --short | head -n 50
+   ```
+
+4. コミットして push し、s1 から出る（s1 で）
+
+   ```sh
+   git commit -m "初期状態" && git push origin main
+   exit
+   ```
+
+5. s2・s3 に s1 のコミットを取り込み、それぞれの初期状態を記録して push（手元で）。`git pull` は未追跡の `webapp/` とぶつかって失敗するので、展開時と同じく fetch → reset → checkout で取り込む
+
+   ```sh
+   for h in "${SERVERS[@]:1}"; do ssh $h 'git fetch -q origin main && git reset -q origin/main && git checkout -- . && make snapshot && git add snapshots && git commit -q -m "初期状態: $(cat .server_id)" && git push -q origin main && git log --oneline -1'; done
+   ```
+
+6. 手元にも取り込む（手元で）
+
+   ```sh
+   git pull
+   ```
 
 ### 4. 計測の準備
 
