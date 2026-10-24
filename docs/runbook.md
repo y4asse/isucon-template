@@ -48,7 +48,7 @@
 
 ### 1. 手元の準備
 
-`~/.ssh/config` にサーバーを書く（IP はポータルで確認）。
+`~/.ssh/config` にサーバーを書く（IP はポータルで確認）。台数がちがうときは Host を増減し、`config.mk` の `SERVERS` も合わせる。
 
 ```
 Host s1
@@ -66,34 +66,35 @@ Host s3
 
 1 つずつ実行し、エラーが出たらそれだけやり直す。
 
-1. リポジトリの URL を設定（SSH 形式。以降のコマンドで使う）
+1. リポジトリの URL（SSH 形式）とサーバーの一覧を設定（以降のコマンドで使う。サーバーは `~/.ssh/config` の Host 名）
 
    ```sh
    REPO=git@github.com:<owner>/<repo>.git
+   SERVERS=(s1 s2 s3)
    ```
 
 2. Deploy key を送る
 
    ```sh
-   for h in s1 s2 s3; do scp ~/.ssh/isucon_deploy_key $h:.ssh/id_ed25519 && ssh $h chmod 600 .ssh/id_ed25519; done
+   for h in "${SERVERS[@]}"; do scp ~/.ssh/isucon_deploy_key $h:.ssh/id_ed25519 && ssh $h chmod 600 .ssh/id_ed25519; done
    ```
 
 3. リポジトリを展開（既存ファイルはそのまま、履歴だけ取り込む）。3 台とも最新コミットが表示されれば成功
 
    ```sh
-   for h in s1 s2 s3; do ssh $h "ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null && git init -q -b main && git remote add origin $REPO && git fetch -q origin main && git reset -q origin/main && git checkout -- . && git log --oneline -1"; done
+   for h in "${SERVERS[@]}"; do ssh $h "ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null && git init -q -b main && git remote add origin $REPO && git fetch -q origin main && git reset -q origin/main && git checkout -- . && git log --oneline -1"; done
    ```
 
    失敗して空の `.git` が残ったら、消してからやり直す
 
    ```sh
-   for h in s1 s2 s3; do ssh $h 'test -z "$(git -C ~ rev-parse -q --verify HEAD)" && rm -rf ~/.git'; done
+   for h in "${SERVERS[@]}"; do ssh $h 'test -z "$(git -C ~ rev-parse -q --verify HEAD)" && rm -rf ~/.git'; done
    ```
 
 4. サーバー ID を設定（Host 名をそのまま使う）
 
    ```sh
-   for h in s1 s2 s3; do ssh $h make set-id ID=$h; done
+   for h in "${SERVERS[@]}"; do ssh $h make set-id ID=$h; done
    ```
 
 5. ツール導入と git 設定（全サーバー並列）。最後に表示される `SERVICE` と `BIN` が空なら `config.mk` で設定する
@@ -105,7 +106,7 @@ Host s3
 6. `.env` を送る
 
    ```sh
-   for h in s1 s2 s3; do scp .env $h:.env; done
+   for h in "${SERVERS[@]}"; do scp .env $h:.env; done
    ```
 
 ### 3. 初期状態をコミット（s1 だけ）
