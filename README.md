@@ -25,7 +25,7 @@ ISUCON 用のテンプレートリポジトリ。お題に依存しない仕組�
 ├── config.mk                  # ★当日編集：サーバー一覧・DB・ログのパスなど
 ├── .env.example               # DISCORD_WEBHOOK_URL（コピーして .env を作る。.env は Git 管理外）
 ├── etc/
-│   ├── common/etc/...         # 全台共通（nginx の LTSV ログ、MySQL・sysctl の追加設定）
+│   ├── common/etc/...         # 全台共通（中身は下の「etc/ の中身」）
 │   └── s1/ s2/ s3/etc/...     # サーバー別（同じパスなら common より優先）
 ├── env/
 │   ├── env.common.sh          # アプリの環境変数（make pull-conf で ~/env.sh から取り込み）
@@ -47,6 +47,27 @@ ISUCON 用のテンプレートリポジトリ。お題に依存しない仕組�
 ~/analysis/<時刻>-<SHA>-sN/    # make analyze の結果
 ~/logs/<時刻>/                 # make bench-prep で退避したログ
 ```
+
+## etc/ の中身
+
+`etc/common/etc/` には出どころの違うファイルが混ざる。**ファイル名に `isucon` が入っているものがテンプレート製**、それ以外は `make pull-conf` で `/etc` から取り込んだお題の設定。
+
+```
+etc/common/etc/
+├── nginx/
+│   ├── conf.d/00-isucon-log.conf     ← テンプレート（LTSV ログ形式と access_log）
+│   ├── nginx.conf                    ← pull-conf
+│   └── sites-available/*             ← pull-conf
+├── mysql/mysql.conf.d/
+│   ├── 99-isucon.cnf                 ← テンプレート（mysqld.cnf より後に読まれて上書き）
+│   └── mysqld.cnf, mysql.cnf         ← pull-conf
+├── sysctl.d/99-isucon.conf           ← テンプレート（接続数の上限引き上げ）
+└── systemd/system/<アプリ>.service    ← pull-conf
+```
+
+- テンプレート製のファイルは `/etc` にない名前なので、`pull-conf` で上書きされない
+- `make deploy` は出どころに関係なく、`etc/common/` → `etc/sN/` の順に全ファイルを `/etc` へコピーし、変更があったものだけ reload / restart する
+- 競技中はどちらも直接編集してよい。設定を足すときは元のファイルより、テンプレート製のファイル（後から読まれて上書きする）に書くほうが差分が小さい
 
 ## make コマンド
 

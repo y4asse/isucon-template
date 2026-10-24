@@ -1,3 +1,4 @@
+# テンプレート製（make pull-conf では上書きされない。README「etc/ の中身」）
 # ISUCON 用の追加設定（mysqld.cnf より後に読まれて上書きする）
 # スロークエリログの ON/OFF は make bench-prep / make finalize で動的に切り替える
 [mysqld]
